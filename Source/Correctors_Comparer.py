@@ -400,8 +400,6 @@ class Correctors_Comparer(RegressionCorrector):
                 
                 if metrics_only==False:
                     if corrector=='RCQ':
-                        #TODO: Potentially extending corr_lc to a list 
-                        #for other parameters
                         corr_lc = self.RCQ(cindex,tpf_b,lc_b,
                                            bkg_pixels,quat_file) 
                     if corrector == 'PLD':
@@ -414,10 +412,8 @@ class Correctors_Comparer(RegressionCorrector):
                         corr_lc = self.CBV(cindex,cadence_mask, tpf_nb, lc_nb)
                     
 #                     if self.parameters[corrector]['add_bkg_flag']==True:
-#                         print('here',corr_lc)
 #                         corr_lc=self.flux_level_adjust(tpf_b,corr_lc,bkg_pixels)
 #                         corr_lc=self.flux_adjust(tpf_b,corr_lc)
-#                         print('there',corr_lc)
 #                     else:
 #                         corr_lc=self.flux_adjust(tpf_nb,corr_lc)
                     
@@ -445,8 +441,8 @@ class Correctors_Comparer(RegressionCorrector):
                     if corrector == 'RCQ' or corrector == 'PLD':
                         metrics_col[flux_column] = \
                         self.new_metrics_calculate(
-                    #TODO: new version of the metrics_calculate method to be incoporated 
-                    #into the rest of metrics methods
+                            #TODO: new version of the metrics_calculate method
+                            #to be incoporated into the rest of metrics methods
                             #corr_lc[cadence_mask],lc_b,spoc_lc,sap_lc[cadence_mask])
                             col_corr_lc[cadence_mask],sap_lc[cadence_mask])
                         
@@ -454,15 +450,15 @@ class Correctors_Comparer(RegressionCorrector):
                     if corrector == 'CBV':
                         metrics_col[flux_column] = \
                         self.new_metrics_calculate(
-                    #TODO: new version of the metrics_calculate method to be incoporated 
-                    #into the rest of metrics methods 
+                            #TODO: new version of the metrics_calculate method
+                            #to be incoporated into the rest of metrics methods
                             #corr_lc,lc_nb,spoc_lc,sap_lc[cadence_mask])
                             col_corr_lc,sap_lc[cadence_mask])
                     
                     sgcdpp=\
                     [x[1] for x in metrics_col[flux_column].items() \
                      if 'sgCDPP' in x[0]]
-                    #TODO: Potentially include the overfit in the future to be
+                    #TODO: In the future, potentially include the overfit to be
                     #used as a goodness-of-fit metric in combination with CDPP
                     
                     hm = statistics.harmonic_mean(sgcdpp)
@@ -712,7 +708,7 @@ class Correctors_Comparer(RegressionCorrector):
             5) Parses the background aperture mask and obtains the background 
                pixel fluxes. 
                    Note: Flux not normalized background components for TESS by 
-                   default #TODO: CHECK
+                   default #TODO: Check
             6) Removes nans from the background pixel fluxes
         """
         
@@ -1156,7 +1152,7 @@ class Correctors_Comparer(RegressionCorrector):
         bkg0 = np.sort(bkg)[2]        #3rd dimmest median pixel
         #bkg0 = np.sort(bkg)[10]         #X dimmest median pixel
         #bkg0 = np.percentile(bkg, 5) #5 percentile
-        #TODO: CHECK USING FULL APERTURE
+        #TODO: Check using the full aperture
             
         npix=self.npix(tpf)
         corrected_lc.flux = corrected_lc.flux - npix*bkg0
@@ -1435,7 +1431,7 @@ class Correctors_Comparer(RegressionCorrector):
                        (Currently not used since it would require adaptations 
                        to fairly compare with neighbours; note also that it 
                        requires connectivity during the run and that it appears
-                       to slowdown the run significantly) #TODO: CHECK
+                       to slowdown the run significantly) #TODO: Check
          'pdc_overfit'  : PDCSAP Lomb-Scargle metric
          'spoc_pdc_overfit'  : SPOC PDCSAP Lomb-Scargle metric
          'pdc_underfit' : SPOC PDCSAP residual correlations metric
@@ -1506,7 +1502,7 @@ class Correctors_Comparer(RegressionCorrector):
                        (Currently not used since it would require adaptations 
                        to fairly compare with neighbours; note also that it 
                        requires connectivity during the run and that it appears
-                       to slowdown the run significantly) #TODO: CHECK
+                       to slowdown the run significantly) #TODO: Check
         """
         
         metrics={}
