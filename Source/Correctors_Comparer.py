@@ -215,13 +215,8 @@ class Correctors_Comparer(RegressionCorrector):
         
         path_to_files = dir_to_files+save_name+'/'
         path_to_pkl_file = path_to_files+'{}.pkl'.format(save_name)
-        #TODO: MOVE LISTS TO PLOTTING
-        #path_to_sap_files = path_to_files+'fits_files/sap/' 
         
         with open(path_to_pkl_file, 'rb') as pickle_file:
-            #TODO: MOVE LISTS TO PLOTTING
-            #Self.corrected_lc_list = pickle.load(plots_file)
-            #self.metrics_list = pickle.load(plots_file)
             self.spoc_lc_filenames = pickle.load(pickle_file)
             self.tpf_filenames = pickle.load(pickle_file)
             self.quat_list = pickle.load(pickle_file)
@@ -229,22 +224,7 @@ class Correctors_Comparer(RegressionCorrector):
             self.cases_list = pickle.load(pickle_file)
             #TODO: ELIMINATE METRICS LIST AND USE INSTEAD METRICS JSON FILES
             #self.metrics_list = pickle.load(pickle_file)
-
-#         TODO: MOVE LISTS TO PLOTTING
-#         filenames = next(walk(path_to_sap_files), (None, None, []))[2]
         
-#         self.sap_lc_list = []
-#         for i in np.arange(len(filenames)):
-#            self.sap_lc_list.append('')
-        
-#         for filename in filenames:
-#            if filename.endswith('.fits'):
-#                sap_lc=lk.read('{}{}'.format(path_to_sap_files,filename))
-#                cindex=(filename.removesuffix('.fits').split('-')[-1])
-#                index=int(cindex)-1
-#                if index >= initial_index and index <= final_index:
-#                    self.sap_lc_list[index]=sap_lc
-      
         return
     
     def load_saved_metrics(self,save_name):
@@ -313,8 +293,6 @@ class Correctors_Comparer(RegressionCorrector):
             self.cbv_dir = download_target_files(
                 self.cases_list, quality_bitmask)
             with open(path_to_pkl_file, 'wb') as pickle_file:
-                #TODO: MOVE LISTS TO PLOTTING
-                #pickle.dump(self.corrected_lc_list, plots_file)
                 pickle.dump(self.spoc_lc_filenames, pickle_file) 
                 pickle.dump(self.tpf_filenames, pickle_file)
                 pickle.dump(self.quat_list, pickle_file)
@@ -322,14 +300,6 @@ class Correctors_Comparer(RegressionCorrector):
                 pickle.dump(self.cases_list, pickle_file)
         else:
             self.load_saved_input(save_name=save_name)
-        
-        #TODO: MOVE LISTS TO PLOTTING
-        # if cindex==0:
-        #     self.corrected_lc_list = []
-        #     self.sap_lc_list = []
-        #     self.metrics_list = []
-        # else:
-        #     self.load_saved_lcs(cindex,self.end_of_bin,save_name=save_name)
         
         #TODO: ELIMINATE METRICS LIST AND USE INSTEAD METRICS JSON FILES
         #self.metrics_list = []
@@ -359,8 +329,6 @@ class Correctors_Comparer(RegressionCorrector):
         
         # #if save_name != None:
         # with open(path_to_pkl_file, 'wb') as pickle_file:
-        #     #TODO: MOVE LISTS TO PLOTTING
-        #     #pickle.dump(self.corrected_lc_list, plots_file)
         #     pickle.dump(self.metrics_list, pickle_file)
         #     #TODO: ELIMINATE METRICS LIST AND USE INSTEAD METRICS JSON FILES
         
@@ -430,8 +398,6 @@ class Correctors_Comparer(RegressionCorrector):
                 #saves SAP lcs to fits files
                 sap_lc.to_fits(path='{}/{}.fits'.format(
                     path_to_fits,sap_lc_name), overwrite=True)
-                #TODO: MOVE LISTS TO PLOTTING
-                #self.sap_lc_list.append(sap_lc)
             
                 #makes symlinks for the PDC lc fits files
                 spoc_lc_name = 'pdc_lc_tic-{}-sector-{}-cindex-{}'.format(
@@ -586,9 +552,7 @@ class Correctors_Comparer(RegressionCorrector):
                 if self.diag_pvar==True:
                     self.diagnose_paramvar(corrector,cindex,min_corr_lc,
                                            save_name,overwrite_ok,path=path)
-                
-            #TODO: MOVE LISTS TO PLOTTING
-            # self.corrected_lc_list.append(correctors_dict)
+            
             #TODO: ELIMINATE METRICS LIST AND USE INSTEAD METRICS JSON FILES
             #self.metrics_list.append(metrics_dict)
 
@@ -1319,7 +1283,6 @@ class Correctors_Comparer(RegressionCorrector):
         spoc_lc = lk.read('{}'.format(self.spoc_lc_filenames[cindex]),
                           quality_bitmask=quality_bitmask)
         
-        #TODO: MOVE LISTS TO PLOTTING
         path_to_files = dir_to_files+save_name+'/'
         path_to_sap_files = path_to_files+'fits_files/sap/'
         filenames_sap = next(walk(path_to_sap_files), (None, None, []))[2]
