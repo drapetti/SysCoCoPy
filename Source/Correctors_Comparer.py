@@ -222,8 +222,6 @@ class Correctors_Comparer(RegressionCorrector):
             self.quat_list = pickle.load(pickle_file)
             self.cbv_dir = pickle.load(pickle_file)
             self.cases_list = pickle.load(pickle_file)
-            #TODO: ELIMINATE METRICS LIST AND USE INSTEAD METRICS JSON FILES
-            #self.metrics_list = pickle.load(pickle_file)
         
         return
     
@@ -287,8 +285,6 @@ class Correctors_Comparer(RegressionCorrector):
 
         if download == True:
             self.cases_list = read_target_cases(self.targets)
-            #TODO: TESTING FILENAMES
-            # self.spoc_lc_list, self.tpf_list, self.quat_list, \
             self.spoc_lc_filenames, self.tpf_filenames, self.quat_list, \
             self.cbv_dir = download_target_files(
                 self.cases_list, quality_bitmask)
@@ -300,9 +296,6 @@ class Correctors_Comparer(RegressionCorrector):
                 pickle.dump(self.cases_list, pickle_file)
         else:
             self.load_saved_input(save_name=save_name)
-        
-        #TODO: ELIMINATE METRICS LIST AND USE INSTEAD METRICS JSON FILES
-        #self.metrics_list = []
         
         total_num_cases = len(self.cases_list)
         num_cases = total_num_cases - self.first_cindex
@@ -327,11 +320,6 @@ class Correctors_Comparer(RegressionCorrector):
                              metrics_only)
             gc.collect()
         
-        # #if save_name != None:
-        # with open(path_to_pkl_file, 'wb') as pickle_file:
-        #     pickle.dump(self.metrics_list, pickle_file)
-        #     #TODO: ELIMINATE METRICS LIST AND USE INSTEAD METRICS JSON FILES
-        
         return
 
     def compare_bin(self,save_name,overwrite_ok,
@@ -348,14 +336,12 @@ class Correctors_Comparer(RegressionCorrector):
             
             quat_file = self.quat_list[cindex]
             
-            #TODO: TESTING FILENAMES
             #reads tpfs and spoc lcs
             tpf = lk.read('{}'.format(self.tpf_filenames[cindex]),
                           quality_bitmask=quality_bitmask)
             spoc_lc = lk.read('{}'.format(self.spoc_lc_filenames[cindex]),
                               quality_bitmask=quality_bitmask)
 
-            #tpf = self.tpf_list[cindex]
             tpf_nb, lc_nb = self.prepare_lc(tpf, add_bkg=False)
             tpf_b, lc_b, bkg_pixels = self.prepare_lc(tpf, add_bkg=True)
             
@@ -363,9 +349,7 @@ class Correctors_Comparer(RegressionCorrector):
             cadence_mask = np.empty(len(lc_nb), dtype=bool)
             
             for idx in np.arange(len(lc_nb)):
-                #TODO: TESTING FILENAMES
                 if ma.is_masked(spoc_lc.flux[idx]):
-                #if ma.is_masked(self.spoc_lc_list[cindex].flux[idx]):
                     cadence_mask[idx] = False
                 else:
                     cadence_mask[idx] = True
@@ -375,11 +359,7 @@ class Correctors_Comparer(RegressionCorrector):
             path_to_fits=path_to_dir+'fits_files/sap'
             makedirs(path_to_fits,exist_ok=True)
             
-            #adjusts SAP light curves
-            
-            #TODO: TESTING FILENAMES
-            #sap_lc = copy.deepcopy(self.spoc_lc_list[cindex])
-            
+            #adjusts SAP light curves            
             #sap_lc = copy.deepcopy(spoc_lc)
             #sap_lc.flux = sap_lc['sap_flux']
             #sap_lc.flux_err = sap_lc['sap_flux_err']
@@ -465,8 +445,6 @@ class Correctors_Comparer(RegressionCorrector):
                     if corrector == 'RCQ' or corrector == 'PLD':
                         metrics_col[flux_column] = \
                         self.new_metrics_calculate(
-                            #TODO: TESTING FILENAMES
-                            #self.spoc_lc_list[cindex],sap_lc)
                     #TODO: new version of the metrics_calculate method to be incoporated 
                     #into the rest of metrics methods
                             #corr_lc[cadence_mask],lc_b,spoc_lc,sap_lc[cadence_mask])
@@ -476,8 +454,6 @@ class Correctors_Comparer(RegressionCorrector):
                     if corrector == 'CBV':
                         metrics_col[flux_column] = \
                         self.new_metrics_calculate(
-                            #TODO: TESTING FILENAMES
-                            #corr_lc,lc_nb,self.spoc_lc_list[cindex],sap_lc)
                     #TODO: new version of the metrics_calculate method to be incoporated 
                     #into the rest of metrics methods 
                             #corr_lc,lc_nb,spoc_lc,sap_lc[cadence_mask])
@@ -530,8 +506,6 @@ class Correctors_Comparer(RegressionCorrector):
                 if corrector == 'RCQ' or corrector == 'PLD':
                     metrics_dict[corrector] = \
                     self.metrics_calculate(
-                        #TODO: TESTING FILENAMES
-                        #self.spoc_lc_list[cindex],sap_lc)
                         min_corr_lc[cadence_mask],lc_b,spoc_lc,
                         sap_lc[cadence_mask])
                         
@@ -539,8 +513,6 @@ class Correctors_Comparer(RegressionCorrector):
                 if corrector == 'CBV':
                     metrics_dict[corrector] =  \
                     self.metrics_calculate(
-                        #TODO: TESTING FILENAMES
-                        #corr_lc,lc_nb,self.spoc_lc_list[cindex],sap_lc)
                         min_corr_lc,lc_nb,spoc_lc,sap_lc[cadence_mask])
                 
                 makedirs(path_to_fits,exist_ok=True)
@@ -552,20 +524,6 @@ class Correctors_Comparer(RegressionCorrector):
                 if self.diag_pvar==True:
                     self.diagnose_paramvar(corrector,cindex,min_corr_lc,
                                            save_name,overwrite_ok,path=path)
-            
-            #TODO: ELIMINATE METRICS LIST AND USE INSTEAD METRICS JSON FILES
-            #self.metrics_list.append(metrics_dict)
-
-            # #saves metrics dictionaries to json files
-            # metrics_name = \
-            # 'metrics_tic-{}-sector-{}-cindex-{}'.format(
-            #     tic, sector, case_idx)
-            # path_to_json = path_to_dir+'json_files/metrics'
-            # makedirs(path_to_json,exist_ok=True)
-            # json_object = json.dumps(metrics_dict, indent = 4)
-            # with open("{}/{}.json".format(
-            #     path_to_json,metrics_name), "w") as outfile:
-            #     outfile.write(json_object)
             
             self.save_metrics_to_json(save_name,overwrite_ok,
                                       metrics_dict,tic,sector,case_idx)
@@ -581,7 +539,6 @@ class Correctors_Comparer(RegressionCorrector):
         Saves corrected lcs to fits files
         """
         
-        #TODO: Extend for other correctors beyond PLD
         paramvar_arr = self.paramvar_arr[corrector]
         param_names = self.param_names[corrector]
         
@@ -1312,19 +1269,13 @@ class Correctors_Comparer(RegressionCorrector):
         
         if plot_type=='separate_plots':
             for corrector in correctors:
-                #TODO: TESTING FILENAMES
-                #ax = self.spoc_lc_list[cindex].scatter(
                 ax = spoc_lc.scatter(
                     c='red', s=msize, alpha=alpha, label='PDCSAP',
                     normalize=norm)
                 if SAP_flag == True:
-                    #TODO: TESTING FILENAMES
-                    #ax = self.sap_lc_list[cindex].scatter(
                     ax = sap_lc.scatter(
                         ax=ax, c='orange', s=msize, alpha=alpha, label='SAP',
                         normalize=norm)
-                #TODO: TESTING FILENAMES
-                #ax = self.corrected_lc_list[cindex][corrector].scatter(
                 ax = corrected_lc[corrector].scatter(
                     ax=ax, c=self.parameters[corrector]['color'], s=msize, 
                     alpha=alpha, label='{}'.format(corrector), 
@@ -1337,20 +1288,14 @@ class Correctors_Comparer(RegressionCorrector):
                 ax.figure.savefig(file, facecolor=(1, 1, 1))
 
         if plot_type=='single_panel':
-            #TODO: TESTING FILENAMES
-            #ax = self.spoc_lc_list[cindex].scatter(
             ax = spoc_lc.scatter(
                 c='red', s=msize, alpha=alpha, label='PDCSAP',
                 normalize=norm)
             if SAP_flag == True:
-                #TODO: TESTING FILENAMES
-                #ax = self.sap_lc_list[cindex].scatter(
                 ax = sap_lc.scatter(
                     ax=ax, c='orange', s=msize, alpha=alpha, label='SAP',
                     normalize=norm)
             for corrector in correctors:
-                #TODO: TESTING FILENAMES
-                #ax = self.corrected_lc_list[cindex][corrector].scatter(
                 ax = corrected_lc[corrector].scatter(
                     ax=ax, c=self.parameters[corrector]['color'], s=msize, 
                     alpha=alpha, label='{}'.format(corrector), 
@@ -1388,8 +1333,6 @@ class Correctors_Comparer(RegressionCorrector):
                         self.metrics_list[cindex][correctors[0]]\
                     ['sap_sgCDPP_{}min'.format(minutes)]*\
                         u.dimensionless_unscaled.to(cds.ppm)*cds.ppm)
-                #TODO: TESTING FILENAMES    
-                #self.sap_lc_list[cindex].scatter(
                 sap_lc.scatter(
                     ax=ax[isub],c='orange',s=msize,alpha=alpha,
                     label='SAP   1.00   {0[0]:.0f}   '\
@@ -1402,8 +1345,6 @@ class Correctors_Comparer(RegressionCorrector):
                     ['pdc_sgCDPP_{}min'.format(minutes)]*\
                         u.dimensionless_unscaled.to(cds.ppm)*cds.ppm)
             POS=self.metrics_list[cindex][correctors[0]]['pdc_overfit']
-            #TODO: TESTING FILENAMES
-            #self.spoc_lc_list[cindex].scatter(
             axLine, axLabel = \
             spoc_lc.scatter(
                 ax=ax[isub], c='red', s=msize, alpha=alpha,
@@ -1425,16 +1366,12 @@ class Correctors_Comparer(RegressionCorrector):
                 OS=self.metrics_list[cindex][corrector]['Over_fit']
                 
                 if SAP_flag == True:
-                    #TODO: TESTING FILENAMES    
-                    #self.sap_lc_list[cindex].scatter(
                     sap_lc.scatter(
                         ax=ax[isub],c='orange',s=msize,alpha=alpha,
                         label='SAP   1.00   {0[0]:.0f}   '\
                         '{0[1]:.0f}   {0[2]:.0f}   {0[3]:.0f}   '\
                         '{0[4]:.0f}'.format(SAP_CDPP),
                         normalize=norm).yaxis.set_tick_params(labeltop=True)
-                #TODO: TESTING FILENAMES
-                #self.corrected_lc_list[cindex][corrector].scatter(
                 axLine, axLabel = \
                 corrected_lc[corrector].scatter(
                     ax=ax[isub], c=self.parameters[corrector]['color'], 
