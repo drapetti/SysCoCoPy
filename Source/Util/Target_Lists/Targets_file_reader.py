@@ -114,14 +114,6 @@ def download_target_files(cases_list,quality_bitmask):
             tic, author=author, sector=sector, exptime=exptime)
         search_tpf = lk.search_targetpixelfile(
             tic, author=author, sector=sector, exptime=exptime) 
-
-        #downloads lcs and tpfs if not already done so
-        # spoc_lc_list.append(search_lc.download(
-        #     download_dir=download_dir, 
-        #     quality_bitmask=quality_bitmask))
-        # tpf_list.append(search_tpf.download(
-        #     download_dir=download_dir, 
-        #     quality_bitmask=quality_bitmask))
         
         #downloads lcs and tpfs if not already done so
         spoc_lc_filename = search_lc.download(
