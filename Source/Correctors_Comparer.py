@@ -1478,9 +1478,9 @@ class Correctors_Comparer(RegressionCorrector):
         #For the calculation of the PDC overfit, use the sap lc from SPOC to
         #have consistent errors (i.e., accounting for full correlation between 
         #the background errors)
-        spoc_sap_lc = copy.deepcopy(spoc_lc_unmasked)
-        spoc_sap_lc.flux = spoc_sap_lc['sap_flux']
-        spoc_sap_lc.flux_err = spoc_sap_lc['sap_flux_err']
+        spoc_sap_lc = copy.deepcopy(spoc_lc)
+        spoc_sap_lc.flux = spoc_sap_lc['sap_flux'].unmasked
+        spoc_sap_lc.flux_err = spoc_sap_lc['sap_flux_err'].unmasked
         metrics['pdc_overfit'] = overfit_metric_lombscargle(spoc_sap_lc,
                                                             spoc_lc_unmasked,
                                                             n_samples=n_samples)
