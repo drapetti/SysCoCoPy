@@ -28,10 +28,9 @@ def read_target_cases(targets_file):
     import numpy as np
     from csv import reader
     from os.path import exists
-    from os import getcwd, system
+    from os import system
     
-    cwd = getcwd()
-    download_dir = cwd + '/Util/Target_Lists/data_files/Lists/'
+    download_dir = 'Util/Target_Lists/data_files/Lists/'
     
     global_cindex = 0
 
@@ -81,10 +80,9 @@ def download_target_files(cases_list,quality_bitmask):
     import numpy as np
     import pathlib
     from os.path import exists
-    from os import getcwd, system
+    from os import system
     
-    cwd = getcwd()
-    download_dir = cwd + '/Util/Target_Lists/data_files/Lists/'
+    download_dir = 'Util/Target_Lists/data_files/Lists/'
     quatdir = download_dir + "stsciDownload/TESS/Quaternions/"
     cbvdir = download_dir + "cbvDownload/TESS/"
     cbvfits_dir = cbvdir + "fits_files/"
