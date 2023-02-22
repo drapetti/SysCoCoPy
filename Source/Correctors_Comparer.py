@@ -1449,15 +1449,16 @@ class Correctors_Comparer(RegressionCorrector):
                 minutes_list[ind])]=sgcdpp_corr
 
             #Unmasking appears to be needed for a newer version of astropy
-            spoc_lc.flux.unmasked
-            spoc_lc.flux_err.unmasked
-            
-            sgcdpp_pdc=float(spoc_lc.estimate_cdpp(
+            spoc_lc_unmasked=copy.deepcopy(spoc_lc)
+            spoc_lc_unmasked.flux=spoc_lc_unmasked.flux.unmasked
+            spoc_lc_unmasked.flux_err=spoc_lc_unmasked.flux_err.unmasked
+                        
+            sgcdpp_pdc_unmasked=float(spoc_lc_unmasked.estimate_cdpp(
                 transit_duration=int(transit_duration), 
                 savgol_window=int(savgol_windows[ind]),
                 savgol_polyorder=savgol_polyorder))            
             metrics['pdc_sgCDPP_{}min'.format(
-                minutes_list[ind])]=sgcdpp_pdc
+                minutes_list[ind])]=sgcdpp_pdc_unmasked
             
             #Unmasking as above might be needed if using the SPOC SAP lc 
             #instead of the SAP lc from to_lightcurve currently used
