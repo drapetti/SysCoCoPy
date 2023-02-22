@@ -1452,13 +1452,13 @@ class Correctors_Comparer(RegressionCorrector):
             spoc_lc_unmasked=copy.deepcopy(spoc_lc)
             spoc_lc_unmasked.flux=spoc_lc_unmasked.flux.unmasked
             spoc_lc_unmasked.flux_err=spoc_lc_unmasked.flux_err.unmasked
-                        
-            sgcdpp_pdc_unmasked=float(spoc_lc_unmasked.estimate_cdpp(
+            
+            sgcdpp_pdc=float(spoc_lc_unmasked.estimate_cdpp(
                 transit_duration=int(transit_duration), 
                 savgol_window=int(savgol_windows[ind]),
                 savgol_polyorder=savgol_polyorder))            
             metrics['pdc_sgCDPP_{}min'.format(
-                minutes_list[ind])]=sgcdpp_pdc_unmasked
+                minutes_list[ind])]=sgcdpp_pdc
             
             #Unmasking as above might be needed if using the SPOC SAP lc 
             #instead of the SAP lc from to_lightcurve currently used
@@ -1478,10 +1478,11 @@ class Correctors_Comparer(RegressionCorrector):
         #For the calculation of the PDC overfit, use the sap lc from SPOC to
         #have consistent errors (i.e., accounting for full correlation between 
         #the background errors)
-        spoc_sap_lc = copy.deepcopy(spoc_lc)
+        spoc_sap_lc = copy.deepcopy(spoc_lc_unmasked)
         spoc_sap_lc.flux = spoc_sap_lc['sap_flux']
         spoc_sap_lc.flux_err = spoc_sap_lc['sap_flux_err']
-        metrics['pdc_overfit'] = overfit_metric_lombscargle(spoc_sap_lc,spoc_lc,
+        metrics['pdc_overfit'] = overfit_metric_lombscargle(spoc_sap_lc,
+                                                            spoc_lc_unmasked,
                                                             n_samples=n_samples)
         #metrics['Under_fit'] = underfit_metric_neighbors(corrected_lc)
         metrics['spoc_pdc_overfit'] = spoc_lc.meta['PDC_NOI']
