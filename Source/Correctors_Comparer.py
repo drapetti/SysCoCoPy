@@ -88,8 +88,12 @@ quantities would needed to be provided for each target.
 """
 
 #quality_bitmask = 16575   # from JT
-quality_bitmask = 16575+512 # from JT+filter out SPOC outliers from lc/tpf
+#quality_bitmask = 16575+512 # from JT+filter out SPOC outliers from lc/tpf
+quality_bitmask = 17071    # test requested by JT
+#quality_bitmask = 16431   # test requested by JT
 ##quality_bitmask = ( 4 | 16 | 32 ) # from H21
+
+time_bin_size=0.02
 
 #transit_time = 0
 #period = 0
@@ -345,11 +349,12 @@ class Correctors_Comparer(RegressionCorrector):
             tpf_nb, lc_nb = self.prepare_lc(tpf, add_bkg=False)
             tpf_b, lc_b, bkg_pixels = self.prepare_lc(tpf, add_bkg=True)
             
-            #cadence masks based on PDCSAP light curves
-            cadence_mask = np.empty(len(lc_nb), dtype=bool)
-            
-            for idx in np.arange(len(lc_nb)):
-                if ma.is_masked(spoc_lc.flux[idx]):
+            #cadence mask for PLD and RCQ based on PDCSAP
+            cadence_mask = np.empty(len(lc_b), dtype=bool)            
+            for idx in np.arange(len(lc_b)):
+                lc_cadence=lc_b.cadenceno[idx]
+                cidx=list(spoc_lc.cadenceno).index(lc_cadence)
+                if ma.is_masked(spoc_lc.flux[cidx]):
                     cadence_mask[idx] = False
                 else:
                     cadence_mask[idx] = True
@@ -373,6 +378,16 @@ class Correctors_Comparer(RegressionCorrector):
             #applying flux fraction and crowding for comparison purposes with
             #the corrrected light curves
             sap_lc = self.flux_adjust(tpf_nb,sap_lc)
+            
+            #cadence mask for SAP based on PDCSAP
+            cadence_mask_sap = np.empty(len(sap_lc), dtype=bool)
+            for idx in np.arange(len(sap_lc)):
+                lc_cadence=sap_lc.cadenceno[idx]
+                cidx=list(spoc_lc.cadenceno).index(lc_cadence)
+                if ma.is_masked(spoc_lc.flux[cidx]):
+                    cadence_mask_sap[idx] = False
+                else:
+                    cadence_mask_sap[idx] = True
             
             if metrics_only==False:
                 #saves SAP lcs to fits files
@@ -409,7 +424,7 @@ class Correctors_Comparer(RegressionCorrector):
                             tpf_in, bkg_pixels = tpf_nb, None
                         corr_lc = self.PLD(cindex,tpf_in, bkg_pixels)  
                     if corrector == 'CBV':
-                        corr_lc = self.CBV(cindex,cadence_mask, tpf_nb, lc_nb)
+                        corr_lc = self.CBV(cindex,cadence_mask_sap, tpf_nb, lc_nb)
                     
 #                     if self.parameters[corrector]['add_bkg_flag']==True:
 #                         corr_lc=self.flux_level_adjust(tpf_b,corr_lc,bkg_pixels)
@@ -441,10 +456,10 @@ class Correctors_Comparer(RegressionCorrector):
                     if corrector == 'RCQ' or corrector == 'PLD':
                         metrics_col[flux_column] = \
                         self.new_metrics_calculate(
-                            #TODO: new version of the metrics_calculate method
-                            #to be incoporated into the rest of metrics methods
-                            #corr_lc[cadence_mask],lc_b,spoc_lc,sap_lc[cadence_mask])
-                            col_corr_lc[cadence_mask],sap_lc[cadence_mask])
+                    #TODO: new version of the metrics_calculate method
+                    #to be incoporated into the rest of metrics methods
+                    #corr_lc[cadence_mask],lc_b,spoc_lc,sap_lc[cadence_mask_sap])
+                            col_corr_lc[cadence_mask],sap_lc[cadence_mask_sap])
                         
                     #adding cadence_mask of PDC for the metrics of SAP
                     if corrector == 'CBV':
@@ -452,8 +467,8 @@ class Correctors_Comparer(RegressionCorrector):
                         self.new_metrics_calculate(
                             #TODO: new version of the metrics_calculate method
                             #to be incoporated into the rest of metrics methods
-                            #corr_lc,lc_nb,spoc_lc,sap_lc[cadence_mask])
-                            col_corr_lc,sap_lc[cadence_mask])
+                            #corr_lc,lc_nb,spoc_lc,sap_lc[cadence_mask_sap])
+                            col_corr_lc,sap_lc[cadence_mask_sap])
                     
                     sgcdpp=\
                     [x[1] for x in metrics_col[flux_column].items() \
@@ -503,13 +518,13 @@ class Correctors_Comparer(RegressionCorrector):
                     metrics_dict[corrector] = \
                     self.metrics_calculate(
                         min_corr_lc[cadence_mask],lc_b,spoc_lc,
-                        sap_lc[cadence_mask])
+                        sap_lc[cadence_mask_sap])
                         
                 #adding cadence_mask of PDC for the metrics of SAP
                 if corrector == 'CBV':
                     metrics_dict[corrector] =  \
                     self.metrics_calculate(
-                        min_corr_lc,lc_nb,spoc_lc,sap_lc[cadence_mask])
+                        min_corr_lc,lc_nb,spoc_lc,sap_lc[cadence_mask_sap])
                 
                 makedirs(path_to_fits,exist_ok=True)
                 path='{}/{}.fits'.format(path_to_fits,corr_lc_name)
@@ -1347,6 +1362,8 @@ class Correctors_Comparer(RegressionCorrector):
                 label='PDC   {0:.2f}   {1[0]:.0f}   {1[1]:.0f}   '\
                 '{1[2]:.0f}   {1[3]:.0f}   {1[4]:.0f}'.format(POS,PDC_CDPP),
                 normalize=norm).get_legend_handles_labels()
+            spoc_lc.bin(time_bin_size=time_bin_size).scatter(
+                ax=ax[isub], c='black')
             ax[isub].tick_params(right=True,direction='in')
             handles.extend(axLine)
             labels.extend(axLabel)
@@ -1376,6 +1393,8 @@ class Correctors_Comparer(RegressionCorrector):
                     '{2[2]:.0f}   {2[3]:.0f}   {2[4]:.0f}'.format(
                         corrector,OS,CDPP),
                     normalize=norm).get_legend_handles_labels()
+                corrected_lc[corrector].bin(
+                    time_bin_size=time_bin_size).scatter(ax=ax[isub], c='black')
                 ax[isub].get_legend().remove()
                 ax[isub].tick_params(right=True,direction='in',
                                      labelright=False)
