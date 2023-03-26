@@ -728,7 +728,14 @@ class Correctors_Comparer(RegressionCorrector):
         """
         
         if add_bkg == True:
-            tpf += tpf.flux_bkg
+            #For the background fluxes/flux errors, substitute NaNs by zeros
+            #This is to avoid converting fluxes/flux errors to NaNs when adding
+            #the background
+            tpf_flux_bkg = np.where(np.isnan(tpf.flux_bkg),0,tpf.flux_bkg)
+            tpf_flux_bkg_err = np.where(
+                np.isnan(tpf.flux_bkg_err),0,tpf.flux_bkg_err)
+            
+            tpf += tpf_flux_bkg
             
             #Procedure to include the background flux errors using the existing
             #add and multiplication mechanisms of the tpf class
@@ -736,7 +743,7 @@ class Correctors_Comparer(RegressionCorrector):
             #Ratio of the flux errors with the background flux errors subtracted 
             #in quadrature and the original flux errors
             mult_corr = np.sqrt( (tpf.flux_err)**2 - \
-                                (tpf.flux_bkg_err)**2 ) / tpf.flux_err
+                                (tpf_flux_bkg_err)**2 ) / tpf.flux_err
             #Including the new flux errors using the multiplication mechanism
             tpf *= mult_corr
             #Correcting the flux by adding the intended flux+background-flux 
