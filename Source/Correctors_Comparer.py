@@ -1,5 +1,5 @@
 """
-File: SysCoCoPy/Correctors_Comparer.py
+File: SysCoCoPy/Source/Correctors_Comparer.py
 Author: David Rapetti
 Date: 17 Feb 2022
 
@@ -31,10 +31,10 @@ from lightkurve.correctors import RegressionCorrector, \
     PLDCorrector, CBVCorrector
 from lightkurve.correctors.designmatrix import DesignMatrix, \
     create_spline_matrix, DesignMatrixCollection
-#from Util.Target_Lists.Targets_file_reader import read_target_file
-from Util.Target_Lists.Targets_file_reader import read_target_cases, \
+#from .Util.Target_Lists.Targets_file_reader import read_target_file
+from .Util.Target_Lists.Targets_file_reader import read_target_cases, \
     download_target_files
-from Util.Quaternions_Design_Matrix import *
+from .Util.Quaternions_Design_Matrix import *
 #TODO: Move metrics calculations to a new class Metrics_Provider
 from lightkurve.correctors.metrics import overfit_metric_lombscargle, \
     underfit_metric_neighbors
@@ -87,13 +87,11 @@ If specific quality and transit masks are needed, the following
 quantities would needed to be provided for each target.
 """
 
-#quality_bitmask = 16575   # from JT
-#quality_bitmask = 16575+512 # from JT+filter out SPOC outliers from lc/tpf
-quality_bitmask = 17071    # test requested by JT
-#quality_bitmask = 16431   # test requested by JT
+#quality_bitmask = 16575   # original from JT
+quality_bitmask = 16575+512 # from JT+filter out SPOC outliers from lc/tpf
+#quality_bitmask = 17071    # test requested by JT for TOI-1835
+#quality_bitmask = 16431   # additional test requested by JT, not used
 ##quality_bitmask = ( 4 | 16 | 32 ) # from H21
-
-time_bin_size=0.02
 
 #transit_time = 0
 #period = 0
@@ -112,8 +110,9 @@ minutes_list=[]
 for transit_duration in transit_durations:
     minutes=int(transit_duration*minutes_cadence)
     minutes_list.append(minutes)
-                
-dir_to_files='data_files/saved_output/'
+
+current_directory=os.getcwd()
+dir_to_files=current_directory+'/SysCoCoPy/Source/data_files/saved_output/'
 available_correctors = list(default_parameters.keys())
 
 #number of samples for the overfit metric
@@ -144,16 +143,16 @@ class Correctors_Comparer(RegressionCorrector):
     
     def __init__(self, targets, correctors, select_case=None, first_cindex=1, 
                  ncases_per_bin=1, remove_outliers=False, diag_pvar=False,
-                 diag_parName=None,propagate_errors=False, 
-                 parameters=None):
+                 diag_parName=None, propagate_errors=False, parameters=None):
         """
         This constructor collects input for subsequent corrector comparisons:
             a) targets/sectors file name, 
             b) correctors names, 
             c) parameter values
         
-        If select_case is None (by default), it proceeds with the case list. If 
-        a case is chosen, it runs only that case (e.g., for testing purposes).
+        If select_case is None (by default) or 'all', it proceeds with the case 
+        list. If a case is chosen, it runs only that case (e.g., for testing 
+        purposes).
         
         Also, the case list can be a sublist of the targets/sectors file 
         starting with:
@@ -306,7 +305,7 @@ class Correctors_Comparer(RegressionCorrector):
         num_full_bins = int(num_cases / self.ncases_per_bin)
         reminder_cases = num_cases % self.ncases_per_bin
 
-        if self.select_case!=None:
+        if self.select_case!=None and self.select_case!='all':
             self.compare_bin(save_name,overwrite_ok,path_to_dir,
                              self.select_case-1,self.select_case,metrics_only)
             return
@@ -424,7 +423,8 @@ class Correctors_Comparer(RegressionCorrector):
                             tpf_in, bkg_pixels = tpf_nb, None
                         corr_lc = self.PLD(cindex,tpf_in, bkg_pixels)  
                     if corrector == 'CBV':
-                        corr_lc = self.CBV(cindex,cadence_mask_sap, tpf_nb, lc_nb)
+                        corr_lc = self.CBV(cindex,cadence_mask_sap, tpf_nb, 
+                                           lc_nb)
                     
 #                     if self.parameters[corrector]['add_bkg_flag']==True:
 #                         corr_lc=self.flux_level_adjust(tpf_b,corr_lc,bkg_pixels)
@@ -728,28 +728,21 @@ class Correctors_Comparer(RegressionCorrector):
         """
         
         if add_bkg == True:
-            #For the background fluxes/flux errors, substitute NaNs by zeros
-            #This is to avoid converting fluxes/flux errors to NaNs when adding
-            #the background
+            #For the background fluxes and background flux errors,
+            #substitute NaNs by zeros; this is to avoid converting fluxes/flux 
+            #errors to NaNs when adding the background            
             tpf_flux_bkg = np.where(np.isnan(tpf.flux_bkg),0,tpf.flux_bkg)
+            tpf_flux_bkg_err = tpf.hdu[1].data['FLUX_BKG_ERR']
             tpf_flux_bkg_err = np.where(
-                np.isnan(tpf.flux_bkg_err),0,tpf.flux_bkg_err)
+                np.isnan(tpf_flux_bkg_err),0,tpf_flux_bkg_err)
             
+            #Adding the background fluxes
             tpf += tpf_flux_bkg
-            
-            #Procedure to include the background flux errors using the existing
-            #add and multiplication mechanisms of the tpf class
-            tpf_flux = tpf.flux
-            #Ratio of the flux errors with the background flux errors subtracted 
-            #in quadrature and the original flux errors
-            mult_corr = np.sqrt( (tpf.flux_err)**2 - \
-                                (tpf_flux_bkg_err)**2 ) / tpf.flux_err
-            #Including the new flux errors using the multiplication mechanism
-            tpf *= mult_corr
-            #Correcting the flux by adding the intended flux+background-flux 
-            #and subtracting the flux which was multiplied by the ratio of 
-            #errors
-            tpf += tpf_flux * (1 - mult_corr)
+
+            #Subtracting the background flux errors in quadrature
+            tpf_flux_err = tpf.hdu[1].data['FLUX_ERR']
+            tpf.hdu[1].data['FLUX_ERR'] = np.sqrt(
+                (tpf_flux_err)**2 - (tpf_flux_bkg_err)**2)
 
         #TODO: The default for the 'sap' method is an aperture_mask of 
         #'default', which corresponds to 'pipeline' if exists or 'threshold' 
@@ -776,6 +769,11 @@ class Correctors_Comparer(RegressionCorrector):
         lc  = lc[~nan_mask]
         
         if add_bkg == True:
+            #To also avoid flux errors with NaNs - not allowed for PLD
+            nan_mask = np.isnan(lc.flux_err)
+            tpf = tpf[~nan_mask]
+            lc  = lc[~nan_mask]
+        
             background_aperture_mask = tpf._parse_aperture_mask('background')
             bkg_pixels = tpf.flux[:, background_aperture_mask].reshape(
                 len(tpf.flux), -1)
@@ -1184,7 +1182,8 @@ class Correctors_Comparer(RegressionCorrector):
     def comparison_plots(self,cindex,correctors=None,
                          msize=0.3,alpha=0.3,norm=False,SAP_flag=True,
                          save_name=None,overwrite_ok=False,
-                         plot_type='joined_panels'):
+                         plot_type='joined_panels',binned_lcs=False,
+                         bin_size=0.02):
         """
         For a given set of correctors, it plots a figure for each 
         comparing the corrected light curve to the PDCSAP and SAP (optional) 
@@ -1205,6 +1204,8 @@ class Correctors_Comparer(RegressionCorrector):
                         1) joined_panels (default)
                         2) separate_plots
                         3) single_panel
+        binned_lcs: choose True to add binned version on top of the lcs
+        bin_size  : time bin size if binned_lcs is True
         """
 
         self.load_saved_input(save_name=save_name)
@@ -1218,17 +1219,18 @@ class Correctors_Comparer(RegressionCorrector):
             for cidx in np.arange(self.first_cindex+1,len(self.cases_list)+1):
                 self.comparison_plot(cidx,correctors,msize,alpha,
                                      norm,SAP_flag,save_name,overwrite_ok,
-                                     plot_type)
+                                     plot_type,binned_lcs,bin_size)
                 with plt.ioff():
                     plt.close()
         else:
             self.comparison_plot(cindex,correctors,msize,alpha,
-                                 norm,SAP_flag,save_name,overwrite_ok,plot_type)
+                                 norm,SAP_flag,save_name,overwrite_ok,plot_type,
+                                 binned_lcs,bin_size)
         
         return
         
     def comparison_plot(self,cindex,correctors,msize,alpha,norm,SAP_flag,
-                        save_name,overwrite_ok,plot_type):
+                        save_name,overwrite_ok,plot_type,binned_lcs,bin_size):
         """
         For a given set of correctors, it plots a figure for each 
         comparing the corrected light curve to the PDCSAP and SAP (optional) 
@@ -1369,8 +1371,9 @@ class Correctors_Comparer(RegressionCorrector):
                 label='PDC   {0:.2f}   {1[0]:.0f}   {1[1]:.0f}   '\
                 '{1[2]:.0f}   {1[3]:.0f}   {1[4]:.0f}'.format(POS,PDC_CDPP),
                 normalize=norm).get_legend_handles_labels()
-            spoc_lc.bin(time_bin_size=time_bin_size).scatter(
-                ax=ax[isub], c='black')
+            if binned_lcs==True:
+                spoc_lc.bin(time_bin_size=bin_size).scatter(
+                    ax=ax[isub], c='black')
             ax[isub].tick_params(right=True,direction='in')
             handles.extend(axLine)
             labels.extend(axLabel)
@@ -1400,8 +1403,9 @@ class Correctors_Comparer(RegressionCorrector):
                     '{2[2]:.0f}   {2[3]:.0f}   {2[4]:.0f}'.format(
                         corrector,OS,CDPP),
                     normalize=norm).get_legend_handles_labels()
-                corrected_lc[corrector].bin(
-                    time_bin_size=time_bin_size).scatter(ax=ax[isub], c='black')
+                if binned_lcs==True:
+                    corrected_lc[corrector].bin(
+                        time_bin_size=bin_size).scatter(ax=ax[isub], c='black')
                 ax[isub].get_legend().remove()
                 ax[isub].tick_params(right=True,direction='in',
                                      labelright=False)
@@ -1418,7 +1422,10 @@ class Correctors_Comparer(RegressionCorrector):
                 title='Method - Overfit Score - '\
                 'sgCDPP ({}min, {}min, {}min, {}min, {}min)'.format(
                     *minutes_list))
-        
+            
+            #If the legend needs to be removed
+            #ax[0].get_legend().remove()
+            
             plt.show()
         
             #if save_name != None:
@@ -1428,7 +1435,7 @@ class Correctors_Comparer(RegressionCorrector):
             file='{}/fig_combined_correctors{}-tic-{}-sector-{}-'\
             'cindex-{}.png'.format(
                 path_to_png,combined_correctors,tic,sector,case)
-            fig.savefig(file, facecolor=(1, 1, 1))
+            fig.savefig(file, format='png', facecolor=(1, 1, 1))
         
         return
     

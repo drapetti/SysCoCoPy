@@ -143,7 +143,7 @@ def filtered_quat_dm(lc, quat_file, three_moments=True):
     
     # Quaternion statistics calculator script from Evan Tey and Chelsea Huang
     # Calculate binned quaternion statistics to match lc times
-    qtimes, quats =  read_quat_file(quat_file, 1)
+    qtimes, quats =  read_quat_file(quat_file, 4)
 
     texp = 30 / 60 / 24
     texp = lc.time.value[1] - lc.time.value[0] # assumes qtimes happens at 

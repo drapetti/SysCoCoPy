@@ -8,12 +8,17 @@ Description: Methods to download and read target cases for the
              Corrector Comparer class
 """
 
-from astropy.utils.decorators import deprecated
 import lightkurve as lk
+from astropy.utils.decorators import deprecated
+from os import getcwd
 
 author='SPOC'
 exptime=120
 
+current_directory = getcwd()
+download_dir = current_directory + \
+'/SysCoCoPy/Source/Util/Target_Lists/data_files/Lists/'
+    
 def read_target_cases(targets_file):
     """
     Reads the input csv file into the corresponding returned list.
@@ -29,8 +34,6 @@ def read_target_cases(targets_file):
     from csv import reader
     from os.path import exists
     from os import system
-    
-    download_dir = 'Util/Target_Lists/data_files/Lists/'
     
     global_cindex = 0
 
@@ -82,7 +85,6 @@ def download_target_files(cases_list,quality_bitmask):
     from os.path import exists
     from os import system
     
-    download_dir = 'Util/Target_Lists/data_files/Lists/'
     quatdir = download_dir + "stsciDownload/TESS/Quaternions/"
     cbvdir = download_dir + "cbvDownload/TESS/"
     cbvfits_dir = cbvdir + "fits_files/"
@@ -107,19 +109,15 @@ def download_target_files(cases_list,quality_bitmask):
         tic = 'TIC {}'.format(case['TIC'])
         sector = case['Sector']
         
-        #searches lcs and tpfs
-        search_lc = lk.search_lightcurve(
-            tic, author=author, sector=sector, exptime=exptime)
-        search_tpf = lk.search_targetpixelfile(
-            tic, author=author, sector=sector, exptime=exptime) 
-        
-        #downloads lcs and tpfs if not already done so
-        spoc_lc_filename = search_lc.download(
+        #Searches and downloads lcs and tpfs if not already done so
+        spoc_lc_filename = lk.search_lightcurve(
+            tic, author=author, sector=sector, exptime=exptime).download(
             download_dir=download_dir,
             quality_bitmask=quality_bitmask).meta['FILENAME']
-        search_tpf.download(
-            download_dir=download_dir,quality_bitmask=quality_bitmask)
-        tpf_filename = spoc_lc_filename.replace('lc.fits','tp.fits')
+        tpf_filename = lk.search_targetpixelfile(
+            tic, author=author, sector=sector, exptime=exptime).download(
+            download_dir=download_dir,quality_bitmask=quality_bitmask).path
+        
         spoc_lc_filenames.append(spoc_lc_filename)
         tpf_filenames.append(tpf_filename)
         
