@@ -12,8 +12,8 @@ import lightkurve as lk
 from astropy.utils.decorators import deprecated
 from os import getcwd
 
-author='SPOC'
-exptime=120
+author_default='SPOC'
+exptime_default=120
 
 current_directory = getcwd()
 download_dir = current_directory + \
@@ -43,6 +43,15 @@ def read_target_cases(targets_file):
     with open('{}{}'.format(download_dir,targets_file)) as csvfile:
         csvtargets = reader(csvfile, delimiter=',')
         header = next(csvtargets)
+        if header[0] == 'Author':
+            author_time = next(csvtargets)
+            author = author_time[0]
+            exptime = author_time[1]
+            header2 = next(csvtargets)
+        else:
+            author = author_default
+            exptime = exptime_default
+        
         for target in csvtargets:
             tic = 'TIC {}'.format(target[0])
             if len(target)==1:
@@ -57,6 +66,8 @@ def read_target_cases(targets_file):
                 cases_list.append(
                     {'TIC':'{}'.format(tic.split(' ')[-1]),
                      'Sector':'{}'.format(sector),
+                     'Author':author,
+                     'Exptime':exptime,
                      'Case_Index':'{}'.format(global_cindex+1)})                
                 global_cindex += 1
                    
@@ -74,7 +85,7 @@ def download_target_files(cases_list,quality_bitmask):
     author          : To choose the mission in searching the lc. 
                       By default is TESS ('SPOC')
     exptime         : To choose the exposure time in searching the lc.
-                      By default is 2 minutes.
+                      By default is 2 minutes
     """
     
     import requests
@@ -108,6 +119,8 @@ def download_target_files(cases_list,quality_bitmask):
     for case in cases_list:
         tic = 'TIC {}'.format(case['TIC'])
         sector = case['Sector']
+        author = case['Author']
+        exptime = case['Exptime']
         
         #Searches and downloads lcs and tpfs if not already done so
         spoc_lc_filename = lk.search_lightcurve(

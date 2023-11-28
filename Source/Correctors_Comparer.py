@@ -26,6 +26,7 @@ from astropy.units import cds, Quantity
 from astropy.io import fits
 from astropy.utils.masked import core
 from astropy.table import setdiff, Table
+from astropy.io.fits.card import Undefined, UNDEFINED
 from itertools import product,groupby
 from lightkurve.correctors import RegressionCorrector, \
     PLDCorrector, CBVCorrector
@@ -1504,7 +1505,11 @@ class Correctors_Comparer(RegressionCorrector):
             
             ind+=1
         
-        metrics['pdc_CDPP_1h'] = (spoc_lc.meta['CDPP1_0'])
+        pdc_CDPP_1h = spoc_lc.meta['CDPP1_0']
+        if isinstance(pdc_CDPP_1h, Undefined):
+            metrics['pdc_CDPP_1h'] = None
+        else:
+            metrics['pdc_CDPP_1h'] = pdc_CDPP_1h
         
         metrics['Over_fit'] = overfit_metric_lombscargle(sap_lc,corrected_lc,
                                                          n_samples=n_samples)
