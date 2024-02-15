@@ -18,7 +18,7 @@ exptime_default=120
 current_directory = getcwd()
 download_dir = current_directory + \
 '/SysCoCoPy/Source/Util/Target_Lists/data_files/Lists/'
-    
+
 def read_target_cases(targets_file):
     """
     Reads the input csv file into the corresponding returned list.
@@ -32,14 +32,12 @@ def read_target_cases(targets_file):
     
     import numpy as np
     from csv import reader
-    from os.path import exists
-    from os import system
     
     global_cindex = 0
 
     cases_list = []
     
-    #reads csv file of cases
+    #read csv file of cases
     with open('{}{}'.format(download_dir,targets_file)) as csvfile:
         csvtargets = reader(csvfile, delimiter=',')
         header = next(csvtargets)
@@ -62,7 +60,7 @@ def read_target_cases(targets_file):
             else:
                 sectors = target[1:]
             for sector in sectors:
-                #builds the cases list
+                #build the cases list
                 cases_list.append(
                     {'TIC':'{}'.format(tic.split(' ')[-1]),
                      'Sector':'{}'.format(sector),
@@ -91,21 +89,18 @@ def download_target_files(cases_list,quality_bitmask):
     import requests
     import re
     import urllib.request
-    import numpy as np
-    import pathlib
     import tarfile
-    from os.path import exists
+    from os import makedirs
+    from os.path import exists, basename
     from os import system
     
     #Download directories for:
     #Quaternions
     quatdir = download_dir + "stsciDownload/TESS/Quaternions/"
+    #create download directory if it do not exist
+    makedirs(quatdir,exist_ok=True)
     #CBV bundles
     cbvdir = download_dir + "cbvDownload/TESS/"
-    cbvdir_hlsp = donwload_dir + "cbvDownload/HLSP/"
-    #CBV FITS files
-    cbvfits_dir = cbvdir + "fits_files/"
-    cbvfits_dir_hlsp = cbvdir_hlsp + "fits_files/"
     
     #MAST directory urls:
     urlBase = "https://archive.stsci.edu/"
@@ -115,7 +110,7 @@ def download_target_files(cases_list,quality_bitmask):
     #SPOC CBVs
     cbv_urldir = urlBase_TESS + "download_scripts/sector/"
     #TESS-SPOC CBVs
-    cbv_urldir_hlsp = urlBase + "hlsp/tess-spoc/"
+    tess_spoc = "hlsps/tess-spoc/"
     
     #MAST files:
     #SPOC CBV curls
@@ -130,32 +125,48 @@ def download_target_files(cases_list,quality_bitmask):
     spoc_lc_filenames = []
     tpf_filenames = []
     quat_list = []
-
+    
     for case in cases_list:
         tic = 'TIC {}'.format(case['TIC'])
         sector = case['Sector']
-        author = case['Author']
         exptime = case['Exptime']
-
+        
+        author = case['Author']
+        #CBV FITS files directory
+        #For now, there is only one Author per sample
+        #TODO: If updated to one per case, cbvfits_dir could then be a list
+        if author == 'SPOC':
+            cbvfits_dir = cbvdir + "fits_files/"
+        elif author == 'TESS-SPOC':
+            cbvfits_dir = cbvdir + "fits_files/" + tess_spoc
+        else:
+            raise Exception('The author selected, {}, is currently not '\
+                            'accepted by the CBV corrector or '\
+                            'incorrect.'.format(author))
+        #create FITS directory if it do not exist
+        makedirs(cbvfits_dir,exist_ok=True)
+        
         #For SPOC CBVs
         cbv_curl_file = curlBaseFile + str(sector) + curlEndFile
         #For TESS-SPOC CBVs
-        gzSectorUrl = "s%04d/hlsp_tess-spoc_tess_ffi_s%04d" % (sector, sector)
-        cbv_gz_file = cbv_urldir_hlsp + gzSectorUrl + gzEndFile
+        isec=int(sector)
+        SecDir = tess_spoc + "s%04d/" % isec
+        cbv_gz_file = "hlsp_tess-spoc_tess_ffi_s%04d" % isec + gzEndFile
         
-        #Searches and downloads lcs and tpfs if not already done so
+        #search and download lcs and tpfs if not already done so
         spoc_lc_filename = lk.search_lightcurve(
             tic, author=author, sector=sector, exptime=exptime).download(
             download_dir=download_dir,
             quality_bitmask=quality_bitmask).meta['FILENAME']
         tpf_filename = lk.search_targetpixelfile(
             tic, author=author, sector=sector, exptime=exptime).download(
-            download_dir=download_dir,quality_bitmask=quality_bitmask).path
+            download_dir=download_dir,
+            quality_bitmask=quality_bitmask).path
         
         spoc_lc_filenames.append(spoc_lc_filename)
         tpf_filenames.append(tpf_filename)
         
-        #downloads quaternions if not already done so
+        #download quaternions if not already done so
         for file in quat_files_all:
             sec_num=int(
             file.split('-')[0].split('_')[1].split('sector')[1])
@@ -167,42 +178,52 @@ def download_target_files(cases_list,quality_bitmask):
                     urllib.request.urlretrieve(url, quat_file)
         quat_list.append(quat_file)
                 
-        #downloads SPOC CBVs if not already done so
+        #download SPOC CBVs if not already done so
         if author == 'SPOC':
             cbv_url_file = cbv_urldir + cbv_curl_file
             cbv_loc_file = cbvdir + cbv_curl_file
-            cbv_file_exists = exists(cbv_url_file)
+            cbv_file_exists = exists(cbv_loc_file)
             if cbv_file_exists == False:
-                #TODO: TEST EXCEPTION
                 try:
                     urllib.request.urlretrieve(cbv_url_file,cbv_loc_file)
-                    system('chmod +x {}'.format(cbv_loc_file))
-                    system('(cd {} && "{}")'.format(
-                        cbvfits_dir, cbv_loc_file))
                 except:
                     system('rm {}'.format(cbv_loc_file))
                     print("Downloading process interrupted.")
                     print("Last .sh file removed: {}".format(cbv_loc_file))
+                system('chmod +x {}'.format(cbv_loc_file))
+                system('(cd {} && "{}")'.format(cbvfits_dir, cbv_loc_file))
         elif author == 'TESS-SPOC':
-            cbv_url_file = cbv_urldir_hlsp + cbv_gz_file
-            cbv_loc_file = cbvdir_hlsp + cbv_gz_file
-            cbv_file_exists = exists(cbv_url_file)
+            cbv_url_file = urlBase + SecDir + cbv_gz_file
+            cbvdir_loc = cbvdir + tess_spoc
+            makedirs(cbvdir_loc,exist_ok=True)
+            cbv_loc_file = cbvdir_loc + cbv_gz_file
+            cbv_file_exists = exists(cbv_loc_file)
             if cbv_file_exists == False:
                 try:
                     urllib.request.urlretrieve(cbv_url_file,cbv_loc_file)
-                    file = tarfile.open(cbv_loc_file)
-                    file.extractall(cbvfits_dir_hlsp)
-                    file.close()
                 except:
                     system('rm {}'.format(cbv_loc_file))
                     print("Downloading process interrupted.")
                     print("Last tar.gz file removed: {}".format(cbv_loc_file))
+                tar = tarfile.open(cbv_loc_file)
+                for member in tar.getmembers():
+                    if member.isreg():
+                        #remove the tar path by reset it
+                        member.name = basename(member.name)
+                        tar.extract(member,cbvfits_dir)
+                        #change name to be readable by load_tess_cbvs
+                        original_file = cbvfits_dir + member.name
+                        (camera,ccd) = re.findall(r'(\d)-',member.name)
+                        new_filename = member.name.replace(
+                            '%s-%s-s%04d'%(camera,ccd,isec),
+                            's%04d-%s-%s-'%(isec,camera,ccd))
+                        new_file = cbvfits_dir + new_filename
+                        system('mv {} {}'.format(original_file, new_file))
+                tar.close()
         else:
             raise Exception('The author selected, ({}), is currently not'\
                             'accepted by the CBV corrector.'.format(author))
-
-    return (spoc_lc_filenames, tpf_filenames, quat_list, 
-            cbvfits_dir, cbvfits_dir_hlsp)
+    return spoc_lc_filenames, tpf_filenames, quat_list, cbvfits_dir
 
 @deprecated(since="1.0")
 def read_target_file(json_name,quality_bitmask,output='filenames',
