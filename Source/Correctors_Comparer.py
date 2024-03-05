@@ -141,14 +141,19 @@ class Correctors_Comparer(RegressionCorrector):
     3) CBV : CBVCorrector plus a spline
     """
     
-    def __init__(self, targets, correctors, select_case=None, first_cindex=1, 
-                 ncases_per_bin=1, remove_outliers=False, diag_pvar=False,
-                 diag_parName=None, propagate_errors=False, parameters=None):
+    def __init__(self, targets, correctors, simulations=None, select_case=None, 
+                 first_cindex=1, ncases_per_bin=1, remove_outliers=False, 
+                 diag_pvar=False, diag_parName=None, propagate_errors=False, 
+                 parameters=None):
         """
         This constructor collects input for subsequent corrector comparisons:
             a) targets/sectors file name, 
             b) correctors names, 
             c) parameter values
+        
+        If simulations is different the default None, a list of tpfs with 
+        injected flux variations from InSimPy can be included to analyze them 
+        instead of the original unmodified data
         
         If select_case is None (by default) or 'all', it proceeds with the case 
         list. If a case is chosen, it runs only that case (e.g., for testing 
@@ -171,6 +176,7 @@ class Correctors_Comparer(RegressionCorrector):
         self.first_cindex = first_cindex-1
         self.ncases_per_bin = ncases_per_bin
         self.correctors = correctors
+        self.simulations = simulations
         self.parameters = parameters
         self.cbv_dir = None
         self.remove_outliers = remove_outliers
@@ -299,6 +305,9 @@ class Correctors_Comparer(RegressionCorrector):
                 pickle.dump(self.cases_list, pickle_file)
         else:
             self.load_saved_input(save_name=save_name)
+            
+        if self.simulations != None:
+            self.tpf_filenames = self.simulations
         
         total_num_cases = len(self.cases_list)
         num_cases = total_num_cases - self.first_cindex
