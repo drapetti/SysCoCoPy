@@ -306,9 +306,9 @@ class Correctors_Comparer(RegressionCorrector):
         num_full_bins = int(num_cases / self.ncases_per_bin)
         reminder_cases = num_cases % self.ncases_per_bin
 
-        if self.select_case!=None and self.select_case!='all':
+        if self.select_case is not None and self.select_case!='all':
             self.compare_bin(save_name,overwrite_ok,path_to_dir,
-                             self.select_case-1,self.select_case,metrics_only)
+                             int(self.select_case)-1,int(self.select_case),metrics_only)
             return
             
         for bin_idx in np.arange(num_full_bins):
@@ -637,7 +637,7 @@ class Correctors_Comparer(RegressionCorrector):
                         '(including path and extenstion): ')
                 
         if dir_exists == False:
-            makedirs(path_to_dir)
+            makedirs(path_to_dir,exist_ok=True)
         else:
             if overwrite_ok == False:
                 dcheck=input('The selected directory {} already exists.\n'\
