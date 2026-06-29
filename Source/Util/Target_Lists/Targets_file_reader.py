@@ -44,7 +44,7 @@ def read_target_cases(targets_file):
         if header[0] == 'Author':
             author_time = next(csvtargets)
             author = author_time[0]
-            exptime = author_time[1]
+            exptime = int(author_time[1])
             header2 = next(csvtargets)
         else:
             author = author_default
@@ -68,7 +68,7 @@ def read_target_cases(targets_file):
                      'Exptime':exptime,
                      'Case_Index':'{}'.format(global_cindex+1)})                
                 global_cindex += 1
-                   
+                
     return cases_list
 
 def download_target_files(cases_list,quality_bitmask):
@@ -116,6 +116,7 @@ def download_target_files(cases_list,quality_bitmask):
     #SPOC CBV curls
     curlBaseFile = "tesscurl_sector_"
     curlEndFile = "_cbv.sh"
+    fast_curlEndFile = "_fast-cbv.sh"
     #TESS-SPOC CBV tar.gzs
     gzEndFile = "_tess_v01_cbv-bulk-dl.tar.gz"
     
@@ -147,19 +148,22 @@ def download_target_files(cases_list,quality_bitmask):
         makedirs(cbvfits_dir,exist_ok=True)
         
         #For SPOC CBVs
-        cbv_curl_file = curlBaseFile + str(sector) + curlEndFile
+        if int(exptime) == 20:
+            cbv_curl_file = curlBaseFile + str(sector) + fast_curlEndFile
+        else:
+            cbv_curl_file = curlBaseFile + str(sector) + curlEndFile
         #For TESS-SPOC CBVs
         isec=int(sector)
         SecDir = tess_spoc + "s%04d/" % isec
         cbv_gz_file = "hlsp_tess-spoc_tess_ffi_s%04d" % isec + gzEndFile
-        
+
         #search and download lcs and tpfs if not already done so
         spoc_lc_filename = lk.search_lightcurve(
-            tic, author=author, sector=sector, exptime=exptime).download(
+            tic, exptime=exptime, author=author, sector=isec).download(
             download_dir=download_dir,
             quality_bitmask=quality_bitmask).meta['FILENAME']
         tpf_filename = lk.search_targetpixelfile(
-            tic, author=author, sector=sector, exptime=exptime).download(
+            tic, exptime=exptime, author=author, sector=isec).download(
             download_dir=download_dir,
             quality_bitmask=quality_bitmask).path
         
@@ -170,14 +174,14 @@ def download_target_files(cases_list,quality_bitmask):
         for file in quat_files_all:
             sec_num=int(
             file.split('-')[0].split('_')[1].split('sector')[1])
-            if sec_num==int(sector):
+            if sec_num==isec:
                 url = quat_urldir + file
                 quat_file = quatdir + file
                 quat_file_exists = exists(quat_file)
                 if quat_file_exists == False:
                     urllib.request.urlretrieve(url, quat_file)
         quat_list.append(quat_file)
-                
+        
         #download SPOC CBVs if not already done so
         if author == 'SPOC':
             cbv_url_file = cbv_urldir + cbv_curl_file

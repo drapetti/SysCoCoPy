@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
 """
 Calculates quaternions statistics and forms a design matrix. 
 Based on stats.py and quaternion.py from Evan Tey and Chelsea Huang.

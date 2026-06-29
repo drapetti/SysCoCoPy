@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
 """
 File: SysCoCoPy/Source/__init__.py
 Author: David Rapetti
