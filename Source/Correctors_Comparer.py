@@ -16,7 +16,7 @@ import dill as pickle
 import statistics
 import copy
 import matplotlib.pyplot as plt
-import os, tempfile
+import os, tempfile, re
 from os import walk
 from os import makedirs
 from matplotlib import cm
@@ -141,19 +141,19 @@ class Correctors_Comparer(RegressionCorrector):
     3) CBV : CBVCorrector plus a spline
     """
     
-    def __init__(self, targets, correctors, simulations=None, select_case=None, 
-                 first_cindex=1, ncases_per_bin=1, remove_outliers=False, 
-                 diag_pvar=False, diag_parName=None, propagate_errors=False, 
-                 parameters=None):
+    def __init__(self, targets, correctors, save_name, overwrite_ok,
+                 input_filenames=None, select_case=None, first_cindex=1,
+                 ncases_per_bin=1, remove_outliers=False, diag_pvar=False,
+                 diag_parName=None, propagate_errors=False, parameters=None):
         """
         This constructor collects input for subsequent corrector comparisons:
             a) targets/sectors file name, 
             b) correctors names, 
             c) parameter values
         
-        If simulations is different the default None, a list of tpfs with 
-        injected flux variations from InSimPy can be included to analyze them 
-        instead of the original unmodified data
+        If input_filenames is different than the default None, a list of tpfs
+        with e.g. injected flux variations from InSimPy can be included to
+        analyze them instead of the original unmodified data
         
         If select_case is None (by default) or 'all', it proceeds with the case 
         list. If a case is chosen, it runs only that case (e.g., for testing 
@@ -175,8 +175,11 @@ class Correctors_Comparer(RegressionCorrector):
         self.select_case = select_case
         self.first_cindex = first_cindex-1
         self.ncases_per_bin = ncases_per_bin
+        #TODO: cleanup 'correctors', 'save_name' and 'overwrite_ok' throughout
         self.correctors = correctors
-        self.simulations = simulations
+        self.save_name = save_name
+        self.overwrite_ok = overwrite_ok
+        self.input_filenames = input_filenames
         self.parameters = parameters
         self.cbv_dir = None
         self.remove_outliers = remove_outliers
@@ -184,7 +187,8 @@ class Correctors_Comparer(RegressionCorrector):
         self.propagate_errors=propagate_errors
         self.diag_pvar = diag_pvar
         self.diag_parName = diag_parName
-        
+        self.spoc_pdc_avail = True
+
         self.paramvar_arr = {}
         self.param_names = {}
         
@@ -200,6 +204,23 @@ class Correctors_Comparer(RegressionCorrector):
         if self.parameters['CBV']['add_bkg_flag']==True:
             raise ValueError('CBV requires add_bkg_flag to be False.')
         
+        path_to_pkl_file = '{}{}/{}.pkl'.format(
+            dir_to_files,save_name,save_name)
+        path_to_pkl_file, path_to_dir = self.set_file_dir(
+            path_to_pkl_file,save_name,overwrite_ok)
+
+        #TODO: for a first run, include filenames after the corrections
+        path_to_fits = path_to_dir+'fits_files/corrected/'
+        makedirs(path_to_fits,exist_ok=True)
+        #TODO: include information on correctors for ordering as needed
+        self.corr_lc_filenames = \
+        [path_to_fits+x for x in next(walk(path_to_fits))[2]]
+
+        self.path_to_png = path_to_dir+'png_files/'
+        makedirs(self.path_to_png,exist_ok=True)
+        self.fig_filenames = \
+        [self.path_to_png+x for x in next(walk(self.path_to_png))[2]]
+
         return
     
     def valid_corrs(self,correctors):
@@ -259,7 +280,8 @@ class Correctors_Comparer(RegressionCorrector):
         return
     
     def compare(self,save_name=None,overwrite_ok=False,download=True,
-                metrics_only=False,corr_diags=False):
+                metrics_only=False,corr_diags=False,
+                transits_cadence_mask=None):
         """
         Reads in the required tpf, lf, and quat filenames for the case list.
         
@@ -280,17 +302,28 @@ class Correctors_Comparer(RegressionCorrector):
         metrics_only : set True if corrected fits files are already calculated 
                        and only metrics are needed
         corr_diags   : set True to use the diagnose methods from the correctors
+        transits_cadence_mask : to test the transit preservation for PLD,
+                                set to a cadence_mask obtained from, for
+                                instance, the create_transit_mask function of
+                                lightkurve.LightCurve; it can be an array with
+                                a transits mask for each case in the target list
         """
         
         if save_name == None:
             save_name=input('Enter name of saving directory: ')
         
         self.corr_diags = corr_diags
-        
+        self.transits_cadence_mask = transits_cadence_mask
+        if self.transits_cadence_mask is not None:
+            print('Warning: <transits_cadence_mask> will be used for PLD')
+
         path_to_pkl_file = '{}{}/{}.pkl'.format(
             dir_to_files,save_name,save_name)
         path_to_pkl_file, path_to_dir = self.set_file_dir(
             path_to_pkl_file,save_name,overwrite_ok)
+        
+        with open(path_to_pkl_file, 'wb') as pickle_file:
+            pickle.dump(self.corr_lc_filenames, pickle_file)
 
         if download == True:
             self.cases_list = read_target_cases(self.targets)
@@ -305,9 +338,11 @@ class Correctors_Comparer(RegressionCorrector):
                 pickle.dump(self.cases_list, pickle_file)
         else:
             self.load_saved_input(save_name=save_name)
+            with open(path_to_pkl_file, 'rb') as pickle_file:
+                self.corr_lc_filenames = pickle.load(pickle_file)
             
-        if self.simulations != None:
-            self.tpf_filenames = self.simulations
+        if self.input_filenames != None:
+            self.tpf_filenames = self.input_filenames
         
         total_num_cases = len(self.cases_list)
         num_cases = total_num_cases - self.first_cindex
@@ -351,8 +386,13 @@ class Correctors_Comparer(RegressionCorrector):
             #reads tpfs and spoc lcs
             tpf = lk.read('{}'.format(self.tpf_filenames[cindex]),
                           quality_bitmask=quality_bitmask)
-            spoc_lc = lk.read('{}'.format(self.spoc_lc_filenames[cindex]),
-                              quality_bitmask=quality_bitmask)
+            if self.spoc_lc_filenames[cindex] is not None:
+                spoc_lc = lk.read('{}'.format(self.spoc_lc_filenames[cindex]),
+                                  quality_bitmask=quality_bitmask)
+            else:
+                sap_lc = tpf.to_lightcurve(method='sap')
+                spoc_lc = copy.deepcopy(sap_lc)
+                self.spoc_pdc_avail = False
 
             tpf_nb, lc_nb = self.prepare_lc(tpf, add_bkg=False)
             tpf_b, lc_b, bkg_pixels = self.prepare_lc(tpf, add_bkg=True)
@@ -382,9 +422,10 @@ class Correctors_Comparer(RegressionCorrector):
             #except for the calculation of the PDC overfit metric
             #TODO: this could be updated in the future;
             #see the prepare_lc and to_spoc_sap_flux_err methods
-            sap_lc = tpf.to_lightcurve(method='sap')
+            if self.spoc_lc_filenames[cindex] != None:
+                sap_lc = tpf.to_lightcurve(method='sap')
             #applying flux fraction and crowding for comparison purposes with
-            #the corrrected light curves
+            #the corrected light curves
             sap_lc = self.flux_adjust(tpf_nb,sap_lc)
             
             #cadence mask for SAP based on PDCSAP
@@ -402,14 +443,15 @@ class Correctors_Comparer(RegressionCorrector):
                 sap_lc.to_fits(path='{}/{}.fits'.format(
                     path_to_fits,sap_lc_name), overwrite=True)
             
-                #makes symlinks for the PDC lc fits files
-                spoc_lc_name = 'pdc_lc_tic-{}-sector-{}-cindex-{}'.format(
-                    tic,sector,case_idx)
-                path_to_fits=path_to_dir+'fits_files/pdc'
-                makedirs(path_to_fits,exist_ok=True)
-                source_name=self.spoc_lc_filenames[cindex]
-                link_name='{}/{}.fits'.format(path_to_fits,spoc_lc_name)
-                self.symlink(source_name,link_name,overwrite=True)
+                if self.spoc_lc_filenames[cindex] != None:
+                    #makes symlinks for the PDC lc fits files
+                    spoc_lc_name = 'pdc_lc_tic-{}-sector-{}-cindex-{}'.format(
+                        tic,sector,case_idx)
+                    path_to_fits=path_to_dir+'fits_files/pdc'
+                    makedirs(path_to_fits,exist_ok=True)
+                    source_name=self.spoc_lc_filenames[cindex]
+                    link_name='{}/{}.fits'.format(path_to_fits,spoc_lc_name)
+                    self.symlink(source_name,link_name,overwrite=True)
             
                 gc.collect()
                         
@@ -420,6 +462,8 @@ class Correctors_Comparer(RegressionCorrector):
                 'corrected_lc_corrector-{}-tic-{}-sector-{}-cindex-{}'.format(
                     corrector, tic, sector, case_idx)
                 path_to_fits = path_to_dir+'fits_files/corrected'
+                self.corr_lc_filenames.append(
+                    '{}/{}.fits'.format(path_to_fits,corr_lc_name))
                 
                 if metrics_only==False:
                     if corrector=='RCQ':
@@ -900,11 +944,19 @@ class Correctors_Comparer(RegressionCorrector):
             paramvar_dict={}
             for param_name in self.param_names[corr]:
                 paramvar_dict[param_name] = paramvar[param_idxs[param_name]]
-            corrected_lc = pld.correct(restore_trend=True,**paramvar_dict,
-                                       propagate_errors=self.propagate_errors)
+            if self.transits_cadence_mask is None:
+                corrected_lc = pld.correct(restore_trend=True,**paramvar_dict,
+                                           propagate_errors=\
+                                           self.propagate_errors)
+            else:
+                corrected_lc = pld.correct(restore_trend=True,**paramvar_dict,
+                                           propagate_errors=\
+                                           self.propagate_errors,
+                                           cadence_mask=\
+                                           self.transits_cadence_mask[cindex])
             
             if self.corr_diags==True:
-                pld.diagnose()
+                _,self.diag_lcs=pld.diagnose()
                 pld.diagnose_masks()
                 
             corrected_lc=self.flux_level_adjust(tpf,corrected_lc,bkg_pixels)
@@ -1266,8 +1318,9 @@ class Correctors_Comparer(RegressionCorrector):
         path_to_png=path_to_dir+'png_files'
         makedirs(path_to_png,exist_ok=True)
 
-        spoc_lc = lk.read('{}'.format(self.spoc_lc_filenames[cindex]),
-                          quality_bitmask=quality_bitmask)
+        if self.spoc_lc_filenames[cindex] != None:
+            spoc_lc = lk.read('{}'.format(self.spoc_lc_filenames[cindex]),
+                              quality_bitmask=quality_bitmask)
         
         path_to_files = dir_to_files+save_name+'/'
         path_to_sap_files = path_to_files+'fits_files/sap/'
@@ -1298,9 +1351,10 @@ class Correctors_Comparer(RegressionCorrector):
         
         if plot_type=='separate_plots':
             for corrector in correctors:
-                ax = spoc_lc.scatter(
-                    c='red', s=msize, alpha=alpha, label='PDCSAP',
-                    normalize=norm)
+                if self.spoc_lc_filenames[cindex] != None:
+                    ax = spoc_lc.scatter(
+                        c='red', s=msize, alpha=alpha, label='PDCSAP',
+                        normalize=norm)
                 if SAP_flag == True:
                     ax = sap_lc.scatter(
                         ax=ax, c='orange', s=msize, alpha=alpha, label='SAP',
@@ -1317,9 +1371,10 @@ class Correctors_Comparer(RegressionCorrector):
                 ax.figure.savefig(file, facecolor=(1, 1, 1))
 
         if plot_type=='single_panel':
-            ax = spoc_lc.scatter(
-                c='red', s=msize, alpha=alpha, label='PDCSAP',
-                normalize=norm)
+            if self.spoc_lc_filenames[cindex] != None:
+                ax = spoc_lc.scatter(
+                    c='red', s=msize, alpha=alpha, label='PDCSAP',
+                    normalize=norm)
             if SAP_flag == True:
                 ax = sap_lc.scatter(
                     ax=ax, c='orange', s=msize, alpha=alpha, label='SAP',
@@ -1341,7 +1396,10 @@ class Correctors_Comparer(RegressionCorrector):
             ax.figure.savefig(file, facecolor=(1, 1, 1))
                     
         if plot_type=='joined_panels':
-            num_subplots=len(correctors)+1
+            if self.spoc_lc_filenames[cindex] != None:
+                num_subplots=len(correctors)+1
+            else:
+                num_subplots=len(correctors)
             ax = np.empty(num_subplots, dtype=object)
             if num_subplots>1:
                 fig, ax = plt.subplots(num_subplots,1,sharex=True,
@@ -1367,26 +1425,27 @@ class Correctors_Comparer(RegressionCorrector):
                     label='SAP   1.00   {0[0]:.0f}   '\
                     '{0[1]:.0f}   {0[2]:.0f}   {0[3]:.0f}   '\
                     '{0[4]:.0f}'.format(SAP_CDPP), normalize=norm)
-            PDC_CDPP=[]
-            for minutes in minutes_list:
-                    PDC_CDPP.append(
-                        self.metrics_list[cindex][correctors[0]]\
-                    ['pdc_sgCDPP_{}min'.format(minutes)]*\
-                        u.dimensionless_unscaled.to(cds.ppm)*cds.ppm)
-            POS=self.metrics_list[cindex][correctors[0]]['pdc_overfit']
-            axLine, axLabel = \
-            spoc_lc.scatter(
-                ax=ax[isub], c='red', s=msize, alpha=alpha,
-                label='PDC   {0:.2f}   {1[0]:.0f}   {1[1]:.0f}   '\
-                '{1[2]:.0f}   {1[3]:.0f}   {1[4]:.0f}'.format(POS,PDC_CDPP),
-                normalize=norm).get_legend_handles_labels()
-            if binned_lcs==True:
-                spoc_lc.bin(time_bin_size=bin_size).scatter(
-                    ax=ax[isub], c='black')
-            ax[isub].tick_params(right=True,direction='in')
-            handles.extend(axLine)
-            labels.extend(axLabel)
-            isub+=1
+            if self.spoc_lc_filenames[cindex] != None:
+                PDC_CDPP=[]
+                for minutes in minutes_list:
+                        PDC_CDPP.append(
+                            self.metrics_list[cindex][correctors[0]]\
+                        ['pdc_sgCDPP_{}min'.format(minutes)]*\
+                            u.dimensionless_unscaled.to(cds.ppm)*cds.ppm)
+                POS=self.metrics_list[cindex][correctors[0]]['pdc_overfit']
+                axLine, axLabel = \
+                spoc_lc.scatter(
+                    ax=ax[isub], c='red', s=msize, alpha=alpha,
+                    label='PDC   {0:.2f}   {1[0]:.0f}   {1[1]:.0f}   '\
+                    '{1[2]:.0f}   {1[3]:.0f}   {1[4]:.0f}'.format(POS,PDC_CDPP),
+                    normalize=norm).get_legend_handles_labels()
+                if binned_lcs==True:
+                    spoc_lc.bin(time_bin_size=bin_size).scatter(
+                        ax=ax[isub], c='black')
+                ax[isub].tick_params(right=True,direction='in')
+                handles.extend(axLine)
+                labels.extend(axLabel)
+                isub+=1
             
             for corrector in correctors:
                 CDPP=[]
@@ -1490,17 +1549,18 @@ class Correctors_Comparer(RegressionCorrector):
             metrics['sgCDPP_{}min'.format(
                 minutes_list[ind])]=sgcdpp_corr
 
-            #Unmasking appears to be needed for a newer version of astropy
-            spoc_lc_unmasked=copy.deepcopy(spoc_lc)
-            spoc_lc_unmasked.flux=spoc_lc_unmasked.flux.unmasked
-            spoc_lc_unmasked.flux_err=spoc_lc_unmasked.flux_err.unmasked
-            
-            sgcdpp_pdc=float(spoc_lc_unmasked.estimate_cdpp(
-                transit_duration=int(transit_duration), 
-                savgol_window=int(savgol_windows[ind]),
-                savgol_polyorder=savgol_polyorder))            
-            metrics['pdc_sgCDPP_{}min'.format(
-                minutes_list[ind])]=sgcdpp_pdc
+            if self.spoc_pdc_avail:
+                #Unmasking appears to be needed for a newer version of astropy
+                spoc_lc_unmasked=copy.deepcopy(spoc_lc)
+                spoc_lc_unmasked.flux=spoc_lc_unmasked.flux.unmasked
+                spoc_lc_unmasked.flux_err=spoc_lc_unmasked.flux_err.unmasked
+
+                sgcdpp_pdc=float(spoc_lc_unmasked.estimate_cdpp(
+                    transit_duration=int(transit_duration),
+                    savgol_window=int(savgol_windows[ind]),
+                    savgol_polyorder=savgol_polyorder))
+                metrics['pdc_sgCDPP_{}min'.format(
+                    minutes_list[ind])]=sgcdpp_pdc
             
             #Unmasking as above might be needed if using the SPOC SAP lc 
             #instead of the SAP lc from to_lightcurve currently used
@@ -1513,22 +1573,23 @@ class Correctors_Comparer(RegressionCorrector):
             
             ind+=1
         
-        metrics['pdc_CDPP_1h'] = (spoc_lc.meta['CDPP1_0'])
-        
         metrics['Over_fit'] = overfit_metric_lombscargle(sap_lc,corrected_lc,
                                                          n_samples=n_samples)
-        #For the calculation of the PDC overfit, use the sap lc from SPOC to
-        #have consistent errors (i.e., accounting for full correlation between 
-        #the background errors)
-        spoc_sap_lc = copy.deepcopy(spoc_lc)
-        spoc_sap_lc.flux = spoc_sap_lc['sap_flux'].unmasked
-        spoc_sap_lc.flux_err = spoc_sap_lc['sap_flux_err'].unmasked
-        metrics['pdc_overfit'] = overfit_metric_lombscargle(spoc_sap_lc,
-                                                            spoc_lc_unmasked,
-                                                            n_samples=n_samples)
-        #metrics['Under_fit'] = underfit_metric_neighbors(corrected_lc)
-        metrics['spoc_pdc_overfit'] = spoc_lc.meta['PDC_NOI']
-        #metrics['pdc_underfit'] = spoc_lc.meta['PDC_COR']
+        if self.spoc_pdc_avail:
+            metrics['pdc_CDPP_1h'] = (spoc_lc.meta['CDPP1_0'])
+
+            #For the calculation of the PDC overfit, use the sap lc from SPOC to
+            #have consistent errors (i.e., accounting for full correlation
+            #between the background errors)
+            spoc_sap_lc = copy.deepcopy(spoc_lc)
+            spoc_sap_lc.flux = spoc_sap_lc['sap_flux'].unmasked
+            spoc_sap_lc.flux_err = spoc_sap_lc['sap_flux_err'].unmasked
+            metrics['pdc_overfit']= \
+            overfit_metric_lombscargle(spoc_sap_lc,spoc_lc_unmasked,
+                                       n_samples=n_samples)
+            #metrics['Under_fit'] = underfit_metric_neighbors(corrected_lc)
+            metrics['spoc_pdc_overfit'] = spoc_lc.meta['PDC_NOI']
+            #metrics['pdc_underfit'] = spoc_lc.meta['PDC_COR']
         
         return metrics
 

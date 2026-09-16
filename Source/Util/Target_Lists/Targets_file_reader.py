@@ -99,7 +99,6 @@ def download_target_files(cases_list,quality_bitmask):
     cbv_request = requests.get(cbv_urldir)
     cbvsh_files = re.findall(r'tesscurl_sector.*?_cbv.sh',cbv_request.text)
 
-    spoc_lc_list = []
     spoc_lc_filenames = []
     tpf_list = []
     tpf_filenames = []
@@ -110,13 +109,17 @@ def download_target_files(cases_list,quality_bitmask):
         sector = case['Sector']
         
         #Searches and downloads lcs and tpfs if not already done so
-        spoc_lc_filename = lk.search_lightcurve(
-            tic, author=author, sector=sector, exptime=exptime).download(
-            download_dir=download_dir,
-            quality_bitmask=quality_bitmask).meta['FILENAME']
-        tpf_filename = lk.search_targetpixelfile(
-            tic, author=author, sector=sector, exptime=exptime).download(
-            download_dir=download_dir,quality_bitmask=quality_bitmask).path
+        try:
+            spoc_lc_filename = lk.search_lightcurve(
+                tic, author=author, sector=sector, exptime=exptime).download(
+                download_dir=download_dir,
+                quality_bitmask=quality_bitmask).meta['FILENAME']
+            tpf_filename = lk.search_targetpixelfile(
+                tic, author=author, sector=sector, exptime=exptime).download(
+                download_dir=download_dir,quality_bitmask=quality_bitmask).path
+        except:
+            spoc_lc_filename = None
+            tpf_filename = None
         
         spoc_lc_filenames.append(spoc_lc_filename)
         tpf_filenames.append(tpf_filename)
@@ -152,8 +155,7 @@ def download_target_files(cases_list,quality_bitmask):
                         print("Download processing interrupted.")
                         print("Last shell-file removed: {}".format(
                             cbv_file))
-       
-    #return spoc_lc_list, tpf_list, quat_list, cbvfits_dir
+
     return spoc_lc_filenames, tpf_filenames, quat_list, cbvfits_dir
 
 @deprecated(since="1.0")
